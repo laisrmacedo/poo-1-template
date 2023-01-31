@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { TAccountDB, TAccountDBPost, TUserDB, TUserDBPost } from './types'
 import { db } from './database/knex'
+import { User } from './models/User'
+import { create } from 'domain'
 
 const app = express()
 
@@ -39,12 +41,27 @@ app.get("/users", async (req: Request, res: Response) => {
         if (q) {
             const result: TUserDB[] = await db("users").where("name", "LIKE", `%${q}%`)
             usersDB = result
+            
         } else {
             const result: TUserDB[] = await db("users")
+            //dado cru
             usersDB = result
         }
+        // userDB[0].name = "Patricia" não deve acontecer
+        // vamos pegar as informações vindas do userDB e instancia-la em um objeto de classe User 
 
-        res.status(200).send(usersDB)
+        //dado instanciado
+        const users = usersDB.map((userDB) => new User(
+            userDB.id,
+            userDB.name,
+            userDB.email,
+            userDB.password,
+            userDB.created_at
+        ))
+
+        // users[0].name = "patricia" //nao permite pq name é privado na classe user
+        
+        res.status(200).send(users)
     } catch (error) {
         console.log(error)
 
@@ -62,7 +79,7 @@ app.get("/users", async (req: Request, res: Response) => {
 
 app.post("/users", async (req: Request, res: Response) => {
     try {
-        const { id, name, email, password } = req.body
+        const { id, name, email, password } = req.body //dado cru
 
         if (typeof id !== "string") {
             res.status(400)
@@ -91,14 +108,33 @@ app.post("/users", async (req: Request, res: Response) => {
             throw new Error("'id' já existe")
         }
 
-        const newUser: TUserDBPost = {
+        //objeto simples usando dado cru do body
+        // const newUser: TUserDBPost = {
+        //     id,
+        //     name,
+        //     email,
+        //     password
+        // }
+
+        //Objeto instanciado
+        const newUser = new User(
             id,
             name,
             email,
-            password
+            password,
+            new Date().toISOString()
+        )
+
+        //objeto para modelar as informações para o banco de dados
+        const newUserDB = {
+            id: newUser.getId(),
+            name: newUser.getName(),
+            email: newUser.getEmail(),
+            password: newUser.getPassword(),
+            created_at: newUser.getCreatedAt()
         }
 
-        await db("users").insert(newUser)
+        await db("users").insert(newUserDB)
         const [ userDB ]: TUserDB[] = await db("users").where({ id })
 
         res.status(201).send(userDB)
@@ -246,3 +282,7 @@ app.put("/accounts/:id/balance", async (req: Request, res: Response) => {
         }
     }
 })
+
+//INSTANCIAR
+const user3 = new User("003", "joao", "joao@email.com", "joao123", "2023-01-30 15:04:00")
+console.log(user3.getName())
